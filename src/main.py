@@ -18,6 +18,20 @@ url = os.getenv('URL_ADDRESS')
 model = YOLO('yolo/yolov8s.pt')
 window_name = 'Stream MJPEG'
 
+def store_results(results):
+    detected_objects = {}
+    if len(results) > 0:
+        for result in results:
+            if len(result.boxes.cls) > 0:
+                for cls in result.boxes.cls:
+                    obj_name = class_names.get(int(cls))
+                    if obj_name == 'person':
+                        if obj_name in detected_objects:
+                            detected_objects[class_names.get(int(cls))] += 1
+                        else:
+                            detected_objects[class_names.get(int(cls))] = 1
+    return detected_objects
+
 @app.get("/detections")
 async def detections(request: Request):
     global running
@@ -32,18 +46,7 @@ async def detections(request: Request):
                     break
 
                 results = model.track(frame, persist=True, verbose=False)
-                detected_objects = {}
-
-                if len(results) > 0:
-                    for result in results:
-                        if len(result.boxes.cls) > 0:
-                            for cls in result.boxes.cls:
-                                obj_name = class_names.get(int(cls))
-                                if obj_name == 'person':
-                                    if obj_name in detected_objects:
-                                        detected_objects[class_names.get(int(cls))] += 1
-                                    else:
-                                        detected_objects[class_names.get(int(cls))] = 1
+                detected_objects = store_results(results)
 
                 yield f"data: {detected_objects}\n\n"
                 await asyncio.sleep(0.1)
